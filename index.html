@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ChatVerse — Pro</title>
+  <meta name="description" content="Professional single-file chat frontend (HTML/CSS/JS) — localStorage persistence, friends by ID, typing, reactions, read/delivered, image attachments, themes, accessibility">
+  <style>
+    /* ---------- Reset / Vars ---------- */
+    :root{
+      --bg: #0f1724; --panel:#0b1220; --muted:rgba(255,255,255,0.65);
+      --accent:#4fd1c5; --accent-2:#3b82f6; --you:#06b6d4; --friend:#111827;
+      --card: rgba(255,255,255,0.03);
+      --glass: linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      --radius:14px;
+    }
+    .light { --bg:#f5f7fb; --panel:#ffffff; --muted:#334155; --accent:#0ea5a4; --you:#0ea5a4; --friend:#f1f5f9; --card:#fff; }
+    *{box-sizing:border-box} html,body{height:100%} body{font-family:Inter,ui-sans-serif,system-ui, -apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial; background:var(--bg); color:var(--muted); display:flex; align-items:center; justify-content:center; padding:20px}
+
+    /* ---------- App shell ---------- */
+    .app{width:1100px; height:720px; display:grid; grid-template-columns:350px 1fr; gap:18px}
+    .panel{background:var(--panel); border-radius:var(--radius); box-shadow:0 8px 30px rgba(2,6,23,0.6); overflow:hidden;}
+
+    /* ---------- Left / Sidebar ---------- */
+    .sidebar{display:flex; flex-direction:column; height:100%}
+    .brand{display:flex; align-items:center; gap:12px; padding:16px 18px; border-bottom:1px solid rgba(255,255,255,0.03)}
+    .logo{width:46px;height:46px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;font-weight:700;color:#022;}
+    .brand h1{font-size:16px;color:var(--muted); margin:0}
+    .profile{display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid rgba(255,255,255,0.02)}
+    .avatar{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,#111827,#0b1220);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent)}
+    .profile .meta{font-size:13px}
+    .profile .meta p{margin:0;color:var(--muted)}
+    .controls{display:flex; gap:8px; margin-left:auto}
+    .btn{background:transparent;border:1px solid rgba(255,255,255,0.03); padding:8px 10px;border-radius:8px;color:var(--muted); cursor:pointer}
+
+    .friend-actions{display:flex; gap:8px; padding:12px 16px; border-bottom:1px solid rgba(255,255,255,0.02)}
+    .friend-actions input{flex:1;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:var(--muted);outline:none}
+    .friend-actions button{padding:10px 12px;border-radius:10px;background:var(--accent);color:#022;border:none;cursor:pointer}
+
+    .search{padding:10px 16px}
+    .search input{width:100%; padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:var(--muted)}
+
+    .friends-list{flex:1; overflow:auto;padding:8px 12px}
+    .friend-item{display:flex; gap:10px; align-items:center; padding:10px; border-radius:10px; cursor:pointer; transition:all .15s}
+    .friend-item:hover{transform:translateY(-2px); background:var(--card)}
+    .friend-item .info{flex:1}
+    .friend-item .name{font-weight:600;color:var(--muted)}
+    .friend-item .meta{font-size:12px; color:rgba(255,255,255,0.45)}
+    .badge{font-size:12px;padding:4px 8px;border-radius:999px;background:rgba(0,0,0,0.35); color:var(--muted)}
+
+    /* ---------- Right / Chat area ---------- */
+    .chat{display:flex; flex-direction:column; height:100%}
+    .chat-header{display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid rgba(255,255,255,0.03); background:var(--glass)}
+    .chat-header .title{font-weight:700;color:var(--muted)}
+    .chat-body{flex:1; overflow:auto; padding:18px; display:flex; flex-direction:column; gap:10px;}
+
+    .msg{max-width:72%; padding:12px 14px; border-radius:14px; position:relative; display:inline-block; word-break:break-word}
+    .msg.you{margin-left:auto;background:linear-gradient(180deg,var(--you),rgba(0,0,0,0.05)); color:#012}
+    .msg.friend{margin-right:auto; background:var(--card); color:var(--muted)}
+    .meta-row{display:flex; gap:8px; align-items:center; margin-top:8px; font-size:11px; color:rgba(255,255,255,0.5)}
+
+    .composer{display:flex; gap:10px; padding:14px; border-top:1px solid rgba(255,255,255,0.02)}
+    .composer input[type="text"]{flex:1;padding:12px;border-radius:999px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:var(--muted);outline:none}
+    .composer .actions{display:flex; gap:8px}
+    .icon-btn{padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03); background:transparent; cursor:pointer}
+
+    /* small helpers */
+    .muted{color:rgba(255,255,255,0.45)}
+    .right{margin-left:auto}
+    .hidden{display:none}
+
+    /* responsiveness */
+    @media (max-width:1100px){.app{width:96%; grid-template-columns:1fr}}
+    @media (max-width:720px){body{padding:10px} .app{height:100vh; grid-template-columns:1fr; width:100%}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <section class="panel sidebar" aria-label="Contacts">
+      <div class="brand">
+        <div class="logo">CV</div>
+        <div>
+          <h1>ChatVerse</h1>
+          <div class="muted">Pro • Frontend demo</div>
+        </div>
+      </div>
+
+      <div class="profile">
+        <div class="avatar" id="avatar">A</div>
+        <div class="meta">
+          <p id="meName">You</p>
+          <p class="muted">ID: <strong id="userIdSmall"></strong></p>
+        </div>
+        <div class="controls">
+          <button class="btn" id="importBtn" title="Import backup">Import</button>
+          <button class="btn" id="exportBtn" title="Export backup">Export</button>
+          <button class="btn" id="themeBtn" title="Toggle theme">Theme</button>
+        </div>
+      </div>
+
+      <div class="friend-actions">
+        <input id="friendIdInput" type="number" inputmode="numeric" placeholder="Add friend by ID (e.g. 123456)">
+        <button id="addFriendBtn">Add</button>
+      </div>
+
+      <div class="search"><input id="searchBox" placeholder="Search friends or ID"></div>
+
+      <div class="friends-list" id="friendsList" role="list"></div>
+    </section>
+
+    <!-- Chat Area -->
+    <section class="panel chat" aria-label="Chat window">
+      <div class="chat-header" id="chatHeader">
+        <div class="title">Select a friend to start</div>
+        <div class="muted">Status: <span id="globalStatus">offline</span></div>
+      </div>
+
+      <div class="chat-body" id="chatBody" role="log" aria-live="polite"></div>
+
+      <div class="composer">
+        <input id="messageInput" type="text" placeholder="Message..." aria-label="Type message">
+        <div class="actions">
+          <button class="icon-btn" id="attachBtn" title="Attach image">📎</button>
+          <input id="fileInput" type="file" accept="image/*" class="hidden">
+          <button class="icon-btn" id="emojiBtn" title="Emoji">😊</button>
+          <button class="icon-btn" id="sendBtn" title="Send">Send</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <template id="friendTpl">
+    <div class="friend-item" role="listitem">
+      <div class="avatar small">U</div>
+      <div class="info">
+        <div class="name">Friend</div>
+        <div class="meta">ID <span class="fid">000000</span> • <span class="status small">online</span></div>
+      </div>
+      <div class="badge unread hidden">0</div>
+    </div>
+  </template>
+
+  <script>
+  // ---------- Utilities ----------
+  const qs = (s, ctx=document) => ctx.querySelector(s);
+  const qsa = (s, ctx=document) => Array.from(ctx.querySelectorAll(s));
+
+  // ---------- App state & storage ----------
+  const state = {
+    user: null, friends: [], chats: {}, selected: null, theme:'dark'
+  };
+
+  function save() {
+    localStorage.setItem('cv_state', JSON.stringify({user:state.user, friends:state.friends, chats:state.chats, theme:state.theme}));
+  }
+  function load(){
+    try{const raw = localStorage.getItem('cv_state'); if(raw){const parsed=JSON.parse(raw); state.user=parsed.user; state.friends=parsed.friends||[]; state.chats=parsed.chats||{}; state.theme=parsed.theme||'dark'}}catch(e){console.warn('load failed',e)}
+  }
+
+  // ---------- Init user ----------
+  function initUser(){
+    if(!state.user){
+      const id = Math.floor(100000 + Math.random()*900000).toString();
+      state.user = {id, name:'You', avatar:initials('You'), lastSeen:Date.now()};
+    }
+    qs('#userIdSmall').textContent = state.user.id;
+    qs('#avatar').textContent = state.user.avatar;
+  }
+
+  function initials(name){ return name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase(); }
+
+  // ---------- Friends UI ----------
+  const friendsListEl = qs('#friendsList');
+  function renderFriends(filter=''){
+    friendsListEl.innerHTML='';
+    const tpl = qs('#friendTpl').content;
+    state.friends.filter(f=> (f.id + ' ' + f.name).includes(filter)).forEach(f=>{
+      const el = tpl.cloneNode(true);
+      const root = el.querySelector('.friend-item');
+      root.dataset.id = f.id;
+      root.querySelector('.avatar.small').textContent = initials(f.name || 'U');
+      root.querySelector('.name').textContent = f.name || ('User '+f.id);
+      root.querySelector('.fid').textContent = f.id;
+      root.querySelector('.status').textContent = (f.online? 'online':'offline');
+      if(!f.online) root.querySelector('.status').classList.add('muted');
+      const unread = state.chats[f.id]?.filter(m=>!m.read && m.to==state.user.id).length || 0;
+      const badge = root.querySelector('.badge'); if(unread){badge.textContent=unread; badge.classList.remove('hidden')} else badge.classList.add('hidden');
+      root.addEventListener('click', ()=> selectFriend(f.id));
+      friendsListEl.appendChild(el);
+    });
+  }
+
+  // ---------- Add / Remove friends ----------
+  qs('#addFriendBtn').addEventListener('click', ()=>{
+    const val = qs('#friendIdInput').value.trim(); if(!val) return alert('Enter ID');
+    if(val === state.user.id) return alert('Cannot add yourself');
+    if(state.friends.find(x=>x.id===val)) return alert('Already added');
+    const friend = {id:val, name:'User '+val, online:true, lastSeen:Date.now()};
+    state.friends.unshift(friend);
+    state.chats[friend.id] = state.chats[friend.id] || [];
+    qs('#friendIdInput').value=''; renderFriends(); save();
+  });
+
+  // ---------- Select friend & chat rendering ----------
+  function selectFriend(id){
+    state.selected = id; const f = state.friends.find(x=>x.id===id); if(!f) return;
+    qs('#chatHeader .title').textContent = f.name + ' • ID ' + f.id;
+    qs('#globalStatus').textContent = f.online? 'online' : ('last seen ' + timeAgo(f.lastSeen));
+    renderMessages(); markRead(id); renderFriends();
+  }
+
+  function renderMessages(){
+    const body = qs('#chatBody'); body.innerHTML=''; if(!state.selected) return;
+    const msgs = state.chats[state.selected] || [];
+    msgs.forEach((m, idx)=>{
+      const div = document.createElement('div'); div.className = 'msg ' + (m.from===state.user.id? 'you':'friend');
+      if(m.img){ const img = document.createElement('img'); img.src = m.img; img.style.maxWidth='320px'; img.style.borderRadius='10px'; img.alt='attachment'; div.appendChild(img); }
+      if(m.text){ const p = document.createElement('div'); p.textContent = m.text; div.appendChild(p); }
+      const meta = document.createElement('div'); meta.className='meta-row'; meta.innerHTML = `<div class="muted">${new Date(m.t).toLocaleString()}</div><div class="muted right">${m.from===state.user.id? (m.read? '✓✓':'✓') : ''}</div>`;
+      div.appendChild(meta);
+      // reaction
+      if(m.reaction){ const r = document.createElement('div'); r.className='muted'; r.style.marginTop='6px'; r.textContent = 'Reaction: ' + m.reaction; div.appendChild(r); }
+      // context menu for reactions & delete
+      div.addEventListener('contextmenu', e=>{ e.preventDefault(); showMessageMenu(state.selected, idx); });
+      body.appendChild(div);
+    });
+    body.scrollTop = body.scrollHeight;
+  }
+
+  function markRead(friendId){ const msgs = state.chats[friendId] || []; msgs.forEach(m=>{ if(m.to===state.user.id) m.read=true }); save(); }
+
+  // ---------- Send message / attachments ----------
+  function sendMessage(text, img){ if(!state.selected) return alert('Pick a friend');
+    const msg = {from: state.user.id, to: state.selected, text: text||'', img: img||null, t: Date.now(), read:false, reaction:null};
+    state.chats[state.selected] = state.chats[state.selected] || []; state.chats[state.selected].push(msg); save(); renderMessages(); simulateReply(); renderFriends();
+  }
+  qs('#sendBtn').addEventListener('click', ()=>{ const v = qs('#messageInput').value.trim(); if(!v) return; sendMessage(v); qs('#messageInput').value=''; });
+  qs('#messageInput').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); qs('#sendBtn').click(); }});
+
+  // Attach image
+  qs('#attachBtn').addEventListener('click', ()=> qs('#fileInput').click());
+  qs('#fileInput').addEventListener('change', async (e)=>{
+    const f = e.target.files[0]; if(!f) return; const data = await fileToDataUrl(f); sendMessage('', data);
+  });
+  function fileToDataUrl(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); }); }
+
+  // Emoji
+  qs('#emojiBtn').addEventListener('click', ()=>{
+    const emoji = prompt('Enter emoji (e.g. 👍 or ❤️)'); if(!emoji) return; const idx = (state.chats[state.selected]||[]).length-1; if(idx>=0) { state.chats[state.selected][idx].reaction = emoji; save(); renderMessages(); }
+  });
+
+  // ---------- message menu ----------
+  function showMessageMenu(friendId, index){
+    const action = prompt('Options: delete, react (emoji), forward (id)'); if(!action) return;
+    const a = action.toLowerCase().trim(); if(a==='delete'){ state.chats[friendId].splice(index,1); save(); renderMessages(); }
+    else if(a==='react'){ const e = prompt('Emoji?'); if(e){ state.chats[friendId][index].reaction=e; save(); renderMessages(); }}
+    else if(a==='forward'){ const id = prompt('Forward to ID:'); if(id && state.chats[id]){ const m = JSON.parse(JSON.stringify(state.chats[friendId][index])); state.chats[id].push(m); save(); } }
+  }
+
+  // ---------- simulate reply & presence ----------
+  function simulateReply(){
+    const id = state.selected; if(!id) return;
+    // mark delivered after 500ms
+    setTimeout(()=>{ const last = state.chats[id][state.chats[id].length-1]; if(last) last.delivered=true; save(); renderMessages(); renderFriends(); },500);
+    // fake typing
+    const typingEl = document.createElement('div'); typingEl.className='muted'; typingEl.textContent = state.friends.find(f=>f.id===id)?.name + ' is typing...'; qs('#chatBody').appendChild(typingEl); qs('#chatBody').scrollTop = qs('#chatBody').scrollHeight;
+    setTimeout(()=>{ typingEl.remove(); const reply = {from:id, to:state.user.id, text: 'Auto-reply: ' + randomReply(), t: Date.now(), read:false}; state.chats[id].push(reply); save(); renderMessages(); renderFriends(); }, 900 + Math.random()*1200);
+  }
+  function randomReply(){ const arr=['Nice!','Okay','I will check','LOL','Sounds good','👍']; return arr[Math.floor(Math.random()*arr.length)]; }
+
+  // presence toggle - randomize some friends online/offline every 10s (demo)
+  function presenceTick(){ state.friends.forEach(f=>{ if(Math.random()>0.85) f.online = !f.online; if(!f.online) f.lastSeen = Date.now() - Math.floor(Math.random()*3600000); }); renderFriends(); save(); }
+  setInterval(presenceTick, 10000);
+
+  // ---------- helpers ----------
+  function timeAgo(ts){ const s = Math.floor((Date.now()-ts)/1000); if(s<60) return s+'s ago'; if(s<3600) return Math.floor(s/60)+'m ago'; if(s<86400) return Math.floor(s/3600)+'h ago'; return Math.floor(s/86400)+'d ago'; }
+
+  // search
+  qs('#searchBox').addEventListener('input', e=> renderFriends(e.target.value.trim()));
+
+  // export/import state
+  qs('#exportBtn').addEventListener('click', ()=>{ const data = JSON.stringify({state}); const a=document.createElement('a'); a.href='data:application/json;charset=utf-8,'+encodeURIComponent(data); a.download='chatverse-backup.json'; a.click(); });
+  qs('#importBtn').addEventListener('click', ()=>{
+    const txt = prompt('Paste backup JSON here'); if(!txt) return; try{ const p = JSON.parse(txt); if(p.state){ state.user = p.state.user; state.friends = p.state.friends||[]; state.chats = p.state.chats||{}; save(); renderFriends(); initUser(); alert('Imported') } }catch(e){alert('Invalid')}
+  });
+
+  // theme
+  qs('#themeBtn').addEventListener('click', ()=>{ state.theme = state.theme==='dark'?'light':'dark'; applyTheme(); save(); });
+  function applyTheme(){ document.body.classList.toggle('light', state.theme==='light'); }
+
+  // message read marker & unread
+  function markReadOnOpen(){ if(state.selected){ const msgs=state.chats[state.selected]||[]; msgs.forEach(m=>{ if(m.to===state.user.id) m.read=true }); save(); renderFriends(); }}
+
+  // keyboard shortcuts
+  window.addEventListener('keydown', e=>{ if(e.ctrlKey && e.key==='k'){ e.preventDefault(); qs('#searchBox').focus(); } if(e.key==='Escape'){ qs('#messageInput').blur(); } });
+
+  // startup
+  (function bootstrap(){ load(); initUser(); if(!state.friends.length){ // seed demo friends
+    for(let i=0;i<4;i++){ const id = (Math.floor(100000 + Math.random()*900000)).toString(); state.friends.push({id, name:'User '+id, online:Math.random()>0.3, lastSeen:Date.now()-Math.floor(Math.random()*3600000)}); state.chats[id]=[]; }
+  }
+  applyTheme(); renderFriends(); save(); })();
+
+  // accessibility: announce new messages
+  const obs = new MutationObserver((m)=>{ m.forEach(rec=>{ if(rec.addedNodes.length) { /* could aria-live to announce */ }}); }); obs.observe(qs('#chatBody'), {childList:true});
+  </script>
+</body>
+</html>
